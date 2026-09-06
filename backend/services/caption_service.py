@@ -157,18 +157,70 @@ Style: Default,{font_clean},{style.fontSize * 2},{primary_color},&H000000FF,{out
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         events = []
-        for cap in captions:
-            start_str = cls.format_timestamp_ass(cap.start)
-            end_str = cls.format_timestamp_ass(cap.end)
-            text = cap.text.strip().replace("\n", "\\N")
-            if style.textTransform == "uppercase":
-                text = text.upper()
-            elif style.textTransform == "capitalize":
-                text = text.title()
+        active_color_ass = cls._hex_to_ass_color(style.activeWordColor or "#00F0FF", 1.0)
+        default_color_ass = primary_color
 
-            # Add ASS blur tag for neon glow bloom if enabled
-            tag_prefix = "{\\blur3}" if style.hasNeonGlow else ""
-            events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{tag_prefix}{text}")
+        for cap in captions:
+            words = cap.words or []
+            # Check if we have word timing to generate dynamic word animations
+            if words and len(words) > 0:
+                for active_idx, active_w in enumerate(words):
+                    w_start_str = cls.format_timestamp_ass(active_w.start)
+                    w_end_str = cls.format_timestamp_ass(active_w.end)
+
+                    # Build the phrase text for this active word's time slice
+                    word_tokens = []
+                    for idx, w in enumerate(words):
+                        raw_word = w.word.strip()
+                        is_current = (idx == active_idx)
+                        is_emp = bool(w.isEmphasized)
+
+                        # Determine casing based on style / Upper Dynamic template
+                        if is_emp or (is_current and style.spotlightCase == "uppercase"):
+                            display_text = raw_word.upper()
+                        elif style.textTransform == "uppercase":
+                            display_text = raw_word.upper()
+                        elif style.normalWordCase == "sentence" and not is_emp:
+                            display_text = raw_word.lower() if idx > 0 else raw_word.capitalize()
+                        else:
+                            display_text = raw_word
+
+                        if is_current:
+                            # Highlighted active word: active color + scale + optional neon blur
+                            scale_int = int(round((style.activeWordScale or 1.15) * 100))
+                            neon_tag = "\\blur4" if style.hasNeonGlow else ""
+                            token = f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}{neon_tag}}}{display_text}{{\\r}}"
+                        elif is_emp:
+                            # Other emphasized keywords
+                            scale_int = 110
+                            token = f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}}}{display_text}{{\\r}}"
+                        else:
+                            token = display_text
+
+                        word_tokens.append(token)
+
+                    # Check for line break if lines were computed
+                    if cap.lines and len(cap.lines) == 2:
+                        line1_word_count = len(cap.lines[0].split())
+                        if 0 < line1_word_count < len(word_tokens):
+                            line1_str = " ".join(word_tokens[:line1_word_count])
+                            line2_str = " ".join(word_tokens[line1_word_count:])
+                            final_event_text = f"{line1_str}\\N{line2_str}"
+                        else:
+                            final_event_text = " ".join(word_tokens)
+                    else:
+                        final_event_text = " ".join(word_tokens)
+
+                    events.append(f"Dialogue: 0,{w_start_str},{w_end_str},Default,,0,0,0,,{final_event_text}")
+            else:
+                # Fallback for plain phrase without word timings
+                start_str = cls.format_timestamp_ass(cap.start)
+                end_str = cls.format_timestamp_ass(cap.end)
+                text = cap.text.strip().replace("\n", "\\N")
+                if style.textTransform == "uppercase":
+                    text = text.upper()
+                tag_prefix = "{\\blur3}" if style.hasNeonGlow else ""
+                events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{tag_prefix}{text}")
 
         return header + "\n".join(events) + "\n"
 

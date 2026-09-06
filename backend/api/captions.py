@@ -8,7 +8,8 @@ from backend.models.caption_models import (
     CaptionItem,
     ProjectData,
     SplitCaptionRequest,
-    MergeCaptionRequest
+    MergeCaptionRequest,
+    ResegmentRequest
 )
 from backend.services.caption_service import caption_service
 
@@ -31,6 +32,12 @@ def merge_captions(request: MergeCaptionRequest, captions: List[CaptionItem]):
         request.firstCaptionId,
         request.secondCaptionId
     )
+    return {"captions": updated}
+
+@router.post("/resegment")
+def resegment_captions(request: ResegmentRequest):
+    from backend.services.segmentation_service import segmentation_service
+    updated = segmentation_service.resegment_captions(request.captions, density=request.density)
     return {"captions": updated}
 
 @router.post("/project/save")

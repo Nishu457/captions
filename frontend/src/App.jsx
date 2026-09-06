@@ -14,7 +14,8 @@ import {
   fetchGPUStatus, 
   uploadMedia, 
   startTranscription, 
-  getJobStatus 
+  getJobStatus,
+  resegmentCaptionsApi
 } from './services/api';
 
 export default function App() {
@@ -27,7 +28,7 @@ export default function App() {
   
   // Captions and Styling
   const [captions, setCaptions] = useState([]);
-  const [style, setStyle] = useState(STYLE_PRESETS['Hormozi Pop']);
+  const [style, setStyle] = useState(STYLE_PRESETS['Upper Dynamic']);
 
   // UI State
   const [activeTab, setActiveTab] = useState('captions'); // 'captions', 'styles', 'upload', 'export'
@@ -75,7 +76,21 @@ export default function App() {
     setCaptions([]);
     setCurrentTime(0);
     setDuration(60);
-    setStyle(STYLE_PRESETS['Hormozi Pop']);
+    setStyle(STYLE_PRESETS['Upper Dynamic']);
+  };
+
+  // Re-segment captions dynamically on density change
+  const handleResegmentDensity = async (newDensity) => {
+    setStyle((prev) => ({ ...prev, density: newDensity }));
+    if (captions.length === 0) return;
+    try {
+      const updated = await resegmentCaptionsApi(captions, newDensity);
+      if (updated && updated.length > 0) {
+        setCaptions(updated);
+      }
+    } catch (err) {
+      console.error('Failed to resegment captions:', err);
+    }
   };
 
   // Start Upload & Transcription Workflow
@@ -220,6 +235,8 @@ export default function App() {
             currentTime={currentTime}
             onUpdateCaptions={setCaptions}
             onSeekTo={setCurrentTime}
+            currentDensity={style.density || 'balanced'}
+            onResegmentDensity={handleResegmentDensity}
           />
         )}
 
@@ -238,6 +255,7 @@ export default function App() {
           <StylePanel
             style={style}
             onUpdateStyle={setStyle}
+            onResegmentDensity={handleResegmentDensity}
           />
         )}
       </div>

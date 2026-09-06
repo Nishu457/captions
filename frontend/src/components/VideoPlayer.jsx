@@ -131,7 +131,7 @@ export default function VideoPlayer({
             />
 
             {/* Captions Rendered Over Video */}
-            <CaptionOverlay activeCaption={activeCaption} style={style} />
+            <CaptionOverlay activeCaption={activeCaption} style={style} currentTime={currentTime} />
 
             {/* Big center play icon on pause */}
             {!isPlaying && (

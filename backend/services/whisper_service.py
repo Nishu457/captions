@@ -147,29 +147,40 @@ class WhisperService:
                 logger.warning(f"Alignment step skipped or failed ({e}), using base segment timestamps.")
 
         if progress_callback:
-            progress_callback(95, "Formatting timestamped captions...")
+            progress_callback(95, "Formatting short-form visual captions...")
 
-        # Convert WhisperX segments into internal CaptionItem format
-        captions: List[CaptionItem] = []
+        from backend.services.segmentation_service import segmentation_service
+
         raw_segments = raw_result.get("segments", [])
-        
-        for idx, seg in enumerate(raw_segments, start=1):
-            text = seg.get("text", "").strip()
-            if not text:
-                continue
-            start_t = round(float(seg.get("start", 0.0)), 3)
-            end_t = round(float(seg.get("end", start_t + 1.0)), 3)
-            if end_t <= start_t:
-                end_t = start_t + 0.5
+        all_words: List[Dict[str, Any]] = []
 
-            captions.append(
-                CaptionItem(
-                    id=f"cap_{idx:03d}",
-                    start=start_t,
-                    end=end_t,
-                    text=text
-                )
-            )
+        for seg in raw_segments:
+            seg_words = seg.get("words", [])
+            if seg_words:
+                for w in seg_words:
+                    all_words.append({
+                        "word": w.get("word", ""),
+                        "start": w.get("start", seg.get("start", 0.0)),
+                        "end": w.get("end", seg.get("end", 0.0)),
+                        "score": w.get("score", 1.0)
+                    })
+            else:
+                # Estimate word timestamps if alignment wasn't available
+                text_words = seg.get("text", "").strip().split()
+                if text_words:
+                    s_t = float(seg.get("start", 0.0))
+                    e_t = float(seg.get("end", s_t + 1.0))
+                    step = max(0.1, (e_t - s_t) / len(text_words))
+                    for i, tw in enumerate(text_words):
+                        all_words.append({
+                            "word": tw,
+                            "start": round(s_t + i * step, 3),
+                            "end": round(s_t + (i + 1) * step, 3),
+                            "score": 1.0
+                        })
+
+        # Smart Segmentation into punchy 2-6 word short-form visual phrases
+        captions = segmentation_service.segment_words(all_words, density="balanced")
 
         gpu_service.empty_cache()
 

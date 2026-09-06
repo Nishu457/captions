@@ -57,6 +57,11 @@ export const mergeCaptionsApi = async (captions, firstCaptionId, secondCaptionId
   return res.data.captions;
 };
 
+export const resegmentCaptionsApi = async (captions, density) => {
+  const res = await api.post('/api/captions/resegment', { captions, density });
+  return res.data.captions;
+};
+
 export const exportSubtitles = async (format, captions, style) => {
   const response = await api.post(
     '/api/export/subtitles',
