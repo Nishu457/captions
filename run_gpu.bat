@@ -33,7 +33,7 @@ echo (NOTE: This will NOT overwrite your existing PyTorch or WhisperX)
 python -c "import fastapi, uvicorn, pydantic, aiofiles, multipart" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo Installing lightweight dependencies (FastAPI, Uvicorn, Aiofiles)...
-    pip install -r backend/requirements.txt --no-deps-warning
+    pip install -r backend/requirements.txt --disable-pip-version-check --no-warn-script-location
 ) else (
     echo Core application dependencies are verified.
 )
