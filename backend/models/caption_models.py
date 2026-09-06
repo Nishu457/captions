@@ -17,21 +17,22 @@ class CaptionItem(BaseModel):
     lines: Optional[List[str]] = []
 
 class CaptionStyle(BaseModel):
-    presetName: Optional[str] = "Upper Dynamic"
-    fontFamily: str = "Montserrat, sans-serif"
-    fontSize: int = 34  # px
-    fontWeight: str = "900"  # 400, 600, 700, 800, 900
+    presetName: Optional[str] = "Hero Spotlight"
+    fontFamily: str = "Poppins, sans-serif"
+    fontSize: int = 36  # px base size
+    fontWeight: str = "600"  # 400, 600, 700, 800, 900
+    heroFontWeight: str = "900"
     textColor: str = "#FFFFFF"
     textOpacity: float = 1.0
     
     # Active Word / Spotlight Styling
-    activeWordColor: str = "#00B4D8"  # Electric blue / spotlight color
-    activeWordScale: float = 1.15     # Scale factor for active/spotlight word
+    activeWordColor: str = "#3091F7"  # Exact electric blue from reference video
+    activeWordScale: float = 2.15     # 2.15x scale for hero spotlight word
     activeWordBackground: Optional[str] = None # For highlight pill
     activeWordBgRadius: int = 8
     spotlightCase: str = "uppercase"  # "uppercase", "normal", "capitalize"
     normalWordCase: str = "sentence"  # "sentence", "uppercase", "normal"
-    highlightType: str = "karaoke"    # "karaoke", "spotlight", "pill", "scale", "neon", "reveal", "none"
+    highlightType: str = "spotlight"   # "spotlight", "karaoke", "pill", "scale", "neon", "reveal", "none"
 
     # Background Box / Pill
     backgroundColor: str = "#000000"
@@ -42,33 +43,34 @@ class CaptionStyle(BaseModel):
     
     # Outline & Shadow
     outlineColor: str = "#000000"
-    outlineWidth: int = 3  # px
+    outlineWidth: int = 0  # 0px matching reference video (clean, no harsh stroke)
     hasShadow: bool = True
-    shadowColor: str = "rgba(0, 0, 0, 0.9)"
-    shadowBlur: int = 12
-    shadowOffsetX: int = 2
-    shadowOffsetY: int = 3
+    shadowColor: str = "rgba(0, 0, 0, 0.65)"
+    shadowBlur: int = 16
+    shadowOffsetX: int = 0
+    shadowOffsetY: int = 4
     
     # Neon Glow Aura
-    hasNeonGlow: bool = False
-    neonColor: str = "#00F0FF"
-    neonIntensity: int = 20
+    hasNeonGlow: bool = True
+    neonColor: str = "#3091F7"
+    neonIntensity: int = 14
 
     # Layout & Density
-    position: str = "middle"  # "bottom", "top", "middle", "custom"
-    verticalPositionPercent: int = 60  # % from top when position="custom" or "middle"
-    alignment: str = "center"  # "left", "center", "right"
-    maxWidthPercent: int = 88
-    letterSpacing: float = 0.8  # px
+    position: str = "left-chest"  # "left-chest", "bottom", "top", "middle", "custom"
+    horizontalPercent: int = 22   # % from left (reference sweet spot)
+    verticalPositionPercent: int = 58  # % from top (chest level)
+    alignment: str = "left"       # "left" matching reference video
+    maxWidthPercent: int = 70
+    letterSpacing: float = 0.5  # px
     lineSpacing: float = 1.15
     textTransform: str = "none"  # Default fallback
     density: str = "balanced"   # "compact", "balanced", "relaxed"
     maxWordsPerCaption: int = 5
-    maxLines: int = 2
+    maxLines: int = 3
     maxCharactersPerLine: int = 28
 
     # Dynamic Animation
-    animationPreset: str = "pop"  # "pop", "bounce", "zoom", "fade", "glitch", "none"
+    animationPreset: str = "smooth-fade"  # "smooth-fade", "pop", "bounce", "zoom", "fade", "none"
 
 class ProjectMetadata(BaseModel):
     id: str

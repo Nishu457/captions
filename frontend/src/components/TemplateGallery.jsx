@@ -87,39 +87,75 @@ export default function TemplateGallery({ currentStyle, onSelectTemplate }) {
               </div>
 
               {/* LIVE ANIMATED PREVIEW BOX */}
-              <div className="h-28 rounded-xl bg-black/60 border border-dark-800/80 p-3 flex flex-col items-center justify-center text-center overflow-hidden my-1 relative">
+              <div className="h-28 rounded-xl bg-black/60 border border-dark-800/80 p-3 flex flex-col justify-center overflow-hidden my-1 relative">
                 {/* Visual Words Preview */}
                 <div 
-                  className="transition-all duration-150 flex flex-col items-center"
+                  className={`transition-all duration-200 flex flex-col ${
+                    p.alignment === 'left' || p.position === 'left-chest' ? 'items-start pl-4 text-left' : 'items-center text-center'
+                  }`}
                   style={{ fontFamily: p.fontFamily }}
                 >
-                  <span className="text-[12px] text-slate-300 font-medium">
-                    {p.spotlightCase === 'uppercase' && animStep === 0 ? 'THE' : 'the'}
-                  </span>
+                  {p.presetName === 'Hero Spotlight' ? (
+                    <>
+                      <span 
+                        className="text-[13px] text-white font-semibold transition-all duration-150"
+                        style={{ opacity: animStep >= 0 ? 1 : 0 }}
+                      >
+                        get
+                      </span>
 
-                  {/* Main Spotlight Word */}
-                  <span
-                    className={`inline-block transition-all duration-150 tracking-wider ${
-                      animStep === 1 ? 'scale-110 font-black' : 'scale-100 font-extrabold'
-                    }`}
-                    style={{
-                      fontSize: `${Math.min(30, p.fontSize - 4)}px`,
-                      textShadow: (animStep === 1 && p.hasNeonGlow)
-                        ? `0 0 10px ${p.neonColor || '#00B4D8'}, 0 0 20px ${p.neonColor || '#00B4D8'}`
-                        : (p.hasShadow ? '0 2px 8px rgba(0,0,0,0.9)' : 'none'),
-                      backgroundColor: (animStep === 1 && p.highlightType === 'pill') ? (p.activeWordBackground || '#10FF70') : 'transparent',
-                      color: (animStep === 1 && p.highlightType === 'pill') ? '#000000' : ((animStep === 1 || p.highlightType === 'spotlight') ? (p.activeWordColor || '#00B4D8') : p.textColor),
-                      padding: (animStep === 1 && p.highlightType === 'pill') ? '1px 8px' : '0px',
-                      borderRadius: (animStep === 1 && p.highlightType === 'pill') ? '6px' : '0px',
-                      textTransform: (p.spotlightCase === 'uppercase' || p.textTransform === 'uppercase') ? 'uppercase' : 'none',
-                    }}
-                  >
-                    BUMBLEBEE
-                  </span>
+                      {/* Main Spotlight Word */}
+                      <span
+                        className="inline-block transition-all duration-200 tracking-wider font-black leading-none my-0.5"
+                        style={{
+                          fontSize: '24px',
+                          color: '#3091F7',
+                          textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 16px rgba(48,145,247,0.5)',
+                          transform: animStep >= 1 ? 'scale(1.02)' : 'scale(0.96)',
+                          opacity: animStep >= 1 ? 1 : 0.4,
+                        }}
+                      >
+                        MOTIVATED
+                      </span>
 
-                  <span className="text-[12px] text-slate-300 font-medium">
-                    {p.textTransform === 'uppercase' ? 'CANNOT FLY' : 'cannot fly'}
-                  </span>
+                      <span 
+                        className="text-[12px] text-slate-200 font-semibold transition-all duration-150"
+                        style={{ opacity: animStep >= 2 ? 1 : 0.3 }}
+                      >
+                        start something
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-[12px] text-slate-300 font-medium">
+                        {p.spotlightCase === 'uppercase' && animStep === 0 ? 'THE' : 'the'}
+                      </span>
+
+                      {/* Main Spotlight Word */}
+                      <span
+                        className={`inline-block transition-all duration-150 tracking-wider ${
+                          animStep === 1 ? 'scale-110 font-black' : 'scale-100 font-extrabold'
+                        }`}
+                        style={{
+                          fontSize: `${Math.min(30, p.fontSize - 4)}px`,
+                          textShadow: (animStep === 1 && p.hasNeonGlow)
+                            ? `0 0 10px ${p.neonColor || '#3091F7'}, 0 0 20px ${p.neonColor || '#3091F7'}`
+                            : (p.hasShadow ? '0 2px 8px rgba(0,0,0,0.9)' : 'none'),
+                          backgroundColor: (animStep === 1 && p.highlightType === 'pill') ? (p.activeWordBackground || '#10FF70') : 'transparent',
+                          color: (animStep === 1 && p.highlightType === 'pill') ? '#000000' : ((animStep === 1 || p.highlightType === 'spotlight') ? (p.activeWordColor || '#3091F7') : p.textColor),
+                          padding: (animStep === 1 && p.highlightType === 'pill') ? '1px 8px' : '0px',
+                          borderRadius: (animStep === 1 && p.highlightType === 'pill') ? '6px' : '0px',
+                          textTransform: (p.spotlightCase === 'uppercase' || p.textTransform === 'uppercase') ? 'uppercase' : 'none',
+                        }}
+                      >
+                        BUMBLEBEE
+                      </span>
+
+                      <span className="text-[12px] text-slate-300 font-medium">
+                        {p.textTransform === 'uppercase' ? 'CANNOT FLY' : 'cannot fly'}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 

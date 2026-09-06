@@ -30,12 +30,12 @@ export default function StylePanel({ style, onUpdateStyle, onResegmentDensity })
   };
 
   const spotlightColors = [
-    { label: 'Electric Blue', color: '#00B4D8' },
+    { label: 'Reference Blue', color: '#3091F7' },
+    { label: 'Electric Cyan', color: '#00B4D8' },
     { label: 'Neon Yellow', color: '#FFE600' },
     { label: 'Lime Green', color: '#10FF70' },
     { label: 'Hot Pink', color: '#FF007F' },
     { label: 'Amber Gold', color: '#FFB800' },
-    { label: 'Cyan Glow', color: '#00F0FF' },
   ];
 
   return (
@@ -211,6 +211,7 @@ export default function StylePanel({ style, onUpdateStyle, onResegmentDensity })
               </label>
               <div className="grid grid-cols-2 gap-1.5 text-xs font-semibold">
                 {[
+                  { id: 'smooth-fade', label: 'Smooth Dissolve (Ref) ✨' },
                   { id: 'pop', label: 'Pop & Punch 🚀' },
                   { id: 'bounce', label: 'Micro Bounce ⚡' },
                   { id: 'zoom', label: 'Zoom Impact 💥' },
@@ -280,11 +281,11 @@ export default function StylePanel({ style, onUpdateStyle, onResegmentDensity })
                 onChange={(e) => updateProp('fontFamily', e.target.value)}
                 className="w-full bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500 font-bold"
               >
+                <option value="Poppins, sans-serif">Poppins (Reference Style)</option>
                 <option value="Montserrat, sans-serif">Montserrat (Bold Punchy)</option>
                 <option value="Anton, sans-serif">Anton (MrBeast Vibe)</option>
                 <option value="Outfit, sans-serif">Outfit (TikTok / Reels)</option>
                 <option value="Syne, sans-serif">Syne (High Trend)</option>
-                <option value="Poppins, sans-serif">Poppins (Smooth Rounded)</option>
                 <option value="Russo One, sans-serif">Russo One (Cyberpunk)</option>
                 <option value="Bebas Neue, sans-serif">Bebas Neue (Tall Cinema)</option>
                 <option value="Inter, sans-serif">Inter (Clean Neutral)</option>
@@ -315,7 +316,7 @@ export default function StylePanel({ style, onUpdateStyle, onResegmentDensity })
                   onChange={(e) => updateProp('fontWeight', e.target.value)}
                   className="w-full bg-dark-800 border border-dark-700 rounded-lg px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-brand-500 font-semibold"
                 >
-                  <option value="600">SemiBold (600)</option>
+                  <option value="600">SemiBold (600 - Ref)</option>
                   <option value="700">Bold (700)</option>
                   <option value="800">ExtraBold (800)</option>
                   <option value="900">Black / Ultra (900)</option>
@@ -326,38 +327,60 @@ export default function StylePanel({ style, onUpdateStyle, onResegmentDensity })
             {/* Position */}
             <div className="pt-2 border-t border-dark-700/60 space-y-2">
               <label className="text-[10px] text-slate-400 block font-semibold uppercase tracking-wider">
-                Screen Position
+                Screen Position & Placement
               </label>
-              <div className="grid grid-cols-4 gap-1 text-[11px] font-semibold">
-                {['top', 'middle', 'bottom', 'custom'].map((pos) => (
+              <div className="grid grid-cols-2 gap-1.5 text-[11px] font-semibold">
+                {[
+                  { id: 'left-chest', label: 'Left Chest (Ref) 🎯', action: () => onUpdateStyle({ ...style, position: 'left-chest', horizontalPercent: 22, verticalPositionPercent: 58, alignment: 'left' }) },
+                  { id: 'middle', label: 'Middle Center', action: () => onUpdateStyle({ ...style, position: 'middle', alignment: 'center', verticalPositionPercent: 58 }) },
+                  { id: 'bottom', label: 'Bottom Center', action: () => onUpdateStyle({ ...style, position: 'bottom', alignment: 'center', verticalPositionPercent: 82 }) },
+                  { id: 'custom', label: 'Custom Free', action: () => updateProp('position', 'custom') },
+                ].map((pos) => (
                   <button
-                    key={pos}
-                    onClick={() => updateProp('position', pos)}
-                    className={`py-1.5 rounded-lg border capitalize transition ${
-                      style.position === pos
+                    key={pos.id}
+                    onClick={pos.action}
+                    className={`py-2 px-2 rounded-lg border transition ${
+                      style.position === pos.id
                         ? 'bg-brand-600/25 border-brand-400 text-brand-300 shadow-glow'
                         : 'bg-dark-850 border-dark-700 text-slate-400 hover:bg-dark-800'
                     }`}
                   >
-                    {pos}
+                    {pos.label}
                   </button>
                 ))}
               </div>
 
-              {style.position === 'custom' && (
-                <div className="mt-2">
-                  <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                    <span>Vertical % from top</span>
-                    <span className="font-mono text-slate-200">{style.verticalPositionPercent}%</span>
+              {(style.position === 'left-chest' || style.position === 'custom') && (
+                <div className="mt-3 space-y-2.5 bg-dark-850/70 p-3 rounded-xl border border-dark-700">
+                  <div>
+                    <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                      <span>Horizontal (% from left)</span>
+                      <span className="font-mono text-brand-400">{style.horizontalPercent ?? 22}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={5}
+                      max={75}
+                      value={style.horizontalPercent ?? 22}
+                      onChange={(e) => updateProp('horizontalPercent', parseInt(e.target.value))}
+                      className="w-full h-1 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min={10}
-                    max={95}
-                    value={style.verticalPositionPercent}
-                    onChange={(e) => updateProp('verticalPositionPercent', parseInt(e.target.value))}
-                    className="w-full h-1 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
-                  />
+
+                  <div>
+                    <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                      <span>Vertical (% from top)</span>
+                      <span className="font-mono text-brand-400">{style.verticalPositionPercent ?? 58}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      value={style.verticalPositionPercent ?? 58}
+                      onChange={(e) => updateProp('verticalPositionPercent', parseInt(e.target.value))}
+                      className="w-full h-1 bg-dark-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                    />
+                  </div>
                 </div>
               )}
             </div>

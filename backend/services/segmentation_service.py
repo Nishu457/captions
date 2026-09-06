@@ -9,12 +9,16 @@ CLAUSE_CONNECTORS = {
     "where", "why", "how", "what", "as", "before", "after", "until"
 }
 
-# Strong impact keywords for auto-emphasis heuristic
+# Strong impact keywords for auto-emphasis heuristic (expanded from reference video analysis)
 EMPHASIS_KEYWORDS = {
     "ai", "best", "worst", "never", "always", "huge", "secret", "money",
     "free", "million", "billion", "first", "last", "crazy", "insane",
     "shocking", "important", "stop", "danger", "win", "lose", "love",
-    "hate", "perfect", "magic", "power", "fast", "easy", "hard", "truth"
+    "hate", "perfect", "magic", "power", "fast", "easy", "hard", "truth",
+    "motivated", "motivation", "wasted", "waste", "thinking", "habits", "habit",
+    "college", "failed", "fail", "same", "things", "start", "back", "want",
+    "learning", "learn", "growth", "life", "goal", "dream", "success",
+    "mistake", "change", "focus", "discipline", "problem", "started", "doing"
 }
 
 DENSITY_RULES = {
@@ -41,7 +45,7 @@ class SegmentationService:
     @classmethod
     def _detect_emphasis(cls, words: List[WordItem]) -> None:
         """
-        Identify high-impact words to spotlight (like 'BUMBLEBEE' in Upper Dynamic).
+        Identify high-impact words to spotlight (like 'MOTIVATED' in reference video).
         Marks WordItem.isEmphasized = True.
         """
         if not words:
@@ -61,7 +65,11 @@ class SegmentationService:
 
         # 2. If no word was emphasized, pick the most prominent non-stopword
         if not found_any and words:
-            stop_words = {"the", "a", "an", "is", "are", "was", "were", "to", "in", "on", "at", "of", "for", "with", "it", "you", "i", "he", "she", "we", "they"}
+            stop_words = {
+                "the", "a", "an", "is", "are", "was", "were", "to", "in", "on",
+                "at", "of", "for", "with", "it", "you", "i", "he", "she", "we",
+                "they", "and", "but", "so", "or", "my", "your", "their", "this", "that"
+            }
             candidate = max(
                 words, 
                 key=lambda w: (
@@ -74,11 +82,37 @@ class SegmentationService:
     @classmethod
     def _compute_balanced_lines(cls, words: List[WordItem], max_chars_per_line: int = 28) -> List[str]:
         """
-        Distribute words into 1 or 2 visually balanced lines.
-        Avoids single orphan words on the second line.
+        Distribute words into the signature 3-tier hierarchy:
+        [Line 1: Prefix Context] -> [Line 2: HERO WORD] -> [Line 3: Suffix Context]
+        matching the reference video.
         """
         if not words:
             return []
+
+        # Check for emphasized hero keyword(s)
+        emp_indices = [i for i, w in enumerate(words) if getattr(w, "isEmphasized", False)]
+        if emp_indices:
+            first_emp = emp_indices[0]
+            last_emp = emp_indices[-1]
+
+            # If hero keyword spans too many words, keep only the first/strongest one
+            if last_emp - first_emp >= 2:
+                last_emp = first_emp
+
+            prefix = " ".join(w.word for w in words[:first_emp]).strip()
+            hero = " ".join(w.word for w in words[first_emp:last_emp + 1]).strip()
+            suffix = " ".join(w.word for w in words[last_emp + 1:]).strip()
+
+            lines = []
+            if prefix:
+                lines.append(prefix)
+            if hero:
+                lines.append(hero)
+            if suffix:
+                lines.append(suffix)
+
+            if lines:
+                return lines
 
         word_texts = [w.word for w in words]
         total_words = len(word_texts)
@@ -89,7 +123,6 @@ class SegmentationService:
             return [total_text]
 
         # Balance into 2 lines
-        # Find split index that minimizes character length difference between line 1 and line 2
         best_split = total_words // 2
         min_diff = 999
 
@@ -97,9 +130,7 @@ class SegmentationService:
             line1 = " ".join(word_texts[:split_idx])
             line2 = " ".join(word_texts[split_idx:])
 
-            # Penalize single-word line 2
             penalty = 20 if split_idx == total_words - 1 else 0
-            # Penalize lines exceeding max_chars
             if len(line1) > max_chars_per_line + 4 or len(line2) > max_chars_per_line + 4:
                 penalty += 30
 

@@ -105,22 +105,32 @@ class CaptionService:
         back_color = cls._hex_to_ass_color(style.backgroundColor, style.backgroundOpacity)
         outline_color = cls._hex_to_ass_color(style.outlineColor, 1.0)
         
-        # Determine ASS alignment:
-        # 1=bottom-left, 2=bottom-center, 3=bottom-right
-        # 4=middle-left, 5=middle-center, 6=middle-right
-        # 7=top-left, 8=top-center, 9=top-right
-        align_row = 2  # bottom default
-        if style.position == "top":
+        # Determine ASS alignment & margins
+        margin_l = 40
+        margin_r = 40
+        margin_v = 40
+
+        if style.position == "left-chest":
+            align_val = 7  # Top-left alignment so stacked lines grow cleanly downward
+            horiz_pct = getattr(style, "horizontalPercent", 22) or 22
+            vert_pct = getattr(style, "verticalPositionPercent", 58) or 58
+            margin_l = int(1920 * (horiz_pct / 100.0))
+            margin_v = int(1080 * (vert_pct / 100.0))
+        elif style.position == "top":
             align_row = 8
+            align_val = align_row - 1 if style.alignment == "left" else (align_row + 1 if style.alignment == "right" else align_row)
+            margin_v = 40
         elif style.position == "middle":
             align_row = 5
-
-        if style.alignment == "left":
-            align_val = align_row - 1
-        elif style.alignment == "right":
-            align_val = align_row + 1
-        else:
-            align_val = align_row
+            align_val = align_row - 1 if style.alignment == "left" else (align_row + 1 if style.alignment == "right" else align_row)
+            margin_v = 0
+        else:  # bottom or custom
+            align_row = 2
+            align_val = align_row - 1 if style.alignment == "left" else (align_row + 1 if style.alignment == "right" else align_row)
+            if style.position == "custom":
+                margin_v = int((100 - style.verticalPositionPercent) * 7.2)
+            else:
+                margin_v = 40
 
         font_clean = style.fontFamily.split(",")[0].replace("'", "").replace('"', '').strip()
         bold_flag = -1 if int(style.fontWeight) >= 600 else 0
@@ -129,17 +139,11 @@ class CaptionService:
         # Shadow depth and color
         shadow_depth = style.shadowBlur if style.hasShadow else 0
         if style.hasNeonGlow:
-            # For neon glow, use neon color for shadow aura
+            # For neon glow, use neon color for soft shadow aura
             shadow_color = cls._hex_to_ass_color(style.neonColor, 0.8)
             shadow_depth = min(8, style.neonIntensity // 3)
         else:
             shadow_color = back_color
-
-        margin_v = 40
-        if style.position == "custom":
-            margin_v = int((100 - style.verticalPositionPercent) * 7.2)
-        elif style.position == "middle":
-            margin_v = 0
 
         header = f"""[Script Info]
 Title: Auto Captions
@@ -151,14 +155,15 @@ PlayResY: 1080
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_clean},{style.fontSize * 2},{primary_color},&H000000FF,{outline_color},{shadow_color},{bold_flag},0,0,0,100,100,{style.letterSpacing},0,{border_style},{style.outlineWidth},{shadow_depth},{align_val},40,40,{margin_v},1
+Style: Default,{font_clean},{style.fontSize * 2},{primary_color},&H000000FF,{outline_color},{shadow_color},{bold_flag},0,0,0,100,100,{style.letterSpacing},0,{border_style},{style.outlineWidth},{shadow_depth},{align_val},{margin_l},{margin_r},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         events = []
-        active_color_ass = cls._hex_to_ass_color(style.activeWordColor or "#00F0FF", 1.0)
+        active_color_ass = cls._hex_to_ass_color(style.activeWordColor or "#3091F7", 1.0)
         default_color_ass = primary_color
+        fade_tag = "{\\fad(90,90)}" if getattr(style, "animationPreset", "") == "smooth-fade" else ""
 
         for cap in captions:
             words = cap.words or []
@@ -168,6 +173,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     w_start_str = cls.format_timestamp_ass(active_w.start)
                     w_end_str = cls.format_timestamp_ass(active_w.end)
 
+                    # Precompute line start indices for proper sentence casing on each line
+                    line_start_indices = {0}
+                    if cap.lines and len(cap.lines) >= 2:
+                        running = 0
+                        for l_text in cap.lines:
+                            line_start_indices.add(running)
+                            running += len(l_text.strip().split())
+
                     # Build the phrase text for this active word's time slice
                     word_tokens = []
                     for idx, w in enumerate(words):
@@ -175,24 +188,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         is_current = (idx == active_idx)
                         is_emp = bool(w.isEmphasized)
 
-                        # Determine casing based on style / Upper Dynamic template
+                        # Determine casing based on style / Hero Spotlight template
                         if is_emp or (is_current and style.spotlightCase == "uppercase"):
                             display_text = raw_word.upper()
                         elif style.textTransform == "uppercase":
                             display_text = raw_word.upper()
                         elif style.normalWordCase == "sentence" and not is_emp:
-                            display_text = raw_word.lower() if idx > 0 else raw_word.capitalize()
+                            if raw_word.lower() == "i":
+                                display_text = "I"
+                            elif idx in line_start_indices:
+                                display_text = raw_word.capitalize()
+                            else:
+                                display_text = raw_word.lower()
                         else:
                             display_text = raw_word
 
                         if is_current:
                             # Highlighted active word: active color + scale + optional neon blur
-                            scale_int = int(round((style.activeWordScale or 1.15) * 100))
-                            neon_tag = "\\blur4" if style.hasNeonGlow else ""
+                            scale_int = int(round((style.activeWordScale or 2.15) * 100))
+                            neon_tag = "\\blur3" if style.hasNeonGlow else ""
                             token = f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}{neon_tag}}}{display_text}{{\\r}}"
                         elif is_emp:
                             # Other emphasized keywords
-                            scale_int = 110
+                            scale_int = int(round((style.activeWordScale or 2.15) * 100))
                             token = f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}}}{display_text}{{\\r}}"
                         else:
                             token = display_text
@@ -200,18 +218,24 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         word_tokens.append(token)
 
                     # Check for line break if lines were computed
-                    if cap.lines and len(cap.lines) == 2:
-                        line1_word_count = len(cap.lines[0].split())
-                        if 0 < line1_word_count < len(word_tokens):
-                            line1_str = " ".join(word_tokens[:line1_word_count])
-                            line2_str = " ".join(word_tokens[line1_word_count:])
-                            final_event_text = f"{line1_str}\\N{line2_str}"
-                        else:
-                            final_event_text = " ".join(word_tokens)
+                    if cap.lines and len(cap.lines) >= 2:
+                        line_slices = []
+                        curr_idx = 0
+                        for line_text in cap.lines:
+                            w_count = len(line_text.strip().split())
+                            if w_count > 0:
+                                line_slices.append(" ".join(word_tokens[curr_idx:curr_idx + w_count]))
+                                curr_idx += w_count
+                        if curr_idx < len(word_tokens):
+                            if line_slices:
+                                line_slices[-1] += " " + " ".join(word_tokens[curr_idx:])
+                            else:
+                                line_slices.append(" ".join(word_tokens))
+                        final_event_text = "\\N".join(line_slices)
                     else:
                         final_event_text = " ".join(word_tokens)
 
-                    events.append(f"Dialogue: 0,{w_start_str},{w_end_str},Default,,0,0,0,,{final_event_text}")
+                    events.append(f"Dialogue: 0,{w_start_str},{w_end_str},Default,,0,0,0,,{fade_tag}{final_event_text}")
             else:
                 # Fallback for plain phrase without word timings
                 start_str = cls.format_timestamp_ass(cap.start)
@@ -220,7 +244,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 if style.textTransform == "uppercase":
                     text = text.upper()
                 tag_prefix = "{\\blur3}" if style.hasNeonGlow else ""
-                events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{tag_prefix}{text}")
+                events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{fade_tag}{tag_prefix}{text}")
 
         return header + "\n".join(events) + "\n"
 

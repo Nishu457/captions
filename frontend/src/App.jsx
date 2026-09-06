@@ -28,7 +28,7 @@ export default function App() {
   
   // Captions and Styling
   const [captions, setCaptions] = useState([]);
-  const [style, setStyle] = useState(STYLE_PRESETS['Upper Dynamic']);
+  const [style, setStyle] = useState(STYLE_PRESETS['Hero Spotlight'] || STYLE_PRESETS['Upper Dynamic']);
 
   // UI State
   const [activeTab, setActiveTab] = useState('captions'); // 'captions', 'styles', 'upload', 'export'
@@ -76,7 +76,7 @@ export default function App() {
     setCaptions([]);
     setCurrentTime(0);
     setDuration(60);
-    setStyle(STYLE_PRESETS['Upper Dynamic']);
+    setStyle(STYLE_PRESETS['Hero Spotlight'] || STYLE_PRESETS['Upper Dynamic']);
   };
 
   // Re-segment captions dynamically on density change

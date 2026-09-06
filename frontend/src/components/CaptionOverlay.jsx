@@ -5,24 +5,40 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
     return null;
   }
 
-  // Calculate position
-  let topPosition = '85%';
-  if (style.position === 'top') {
-    topPosition = '14%';
-  } else if (style.position === 'middle') {
-    topPosition = `${style.verticalPositionPercent || 58}%`;
+  const isLeftChest = style.position === 'left-chest' || (style.alignment === 'left' && style.horizontalPercent !== undefined);
+
+  // Positioning
+  let containerStyle = {
+    top: `${style.verticalPositionPercent || 58}%`,
+    transform: 'translateY(-50%)',
+    justifyContent: 'center',
+    width: '100%',
+    left: 0,
+    right: 0,
+  };
+
+  if (isLeftChest) {
+    containerStyle = {
+      top: `${style.verticalPositionPercent || 58}%`,
+      left: `${style.horizontalPercent ?? 22}%`,
+      transform: 'translateY(-50%)',
+      justifyContent: 'flex-start',
+      width: 'auto',
+      maxWidth: `${style.maxWidthPercent || 68}%`,
+    };
+  } else if (style.position === 'top') {
+    containerStyle.top = '14%';
   } else if (style.position === 'custom') {
-    topPosition = `${style.verticalPositionPercent}%`;
+    containerStyle.top = `${style.verticalPositionPercent}%`;
+  } else if (style.position === 'bottom') {
+    containerStyle.top = `${style.verticalPositionPercent || 82}%`;
   }
 
-  let textAlign = 'center';
-  let justifyContent = 'center';
+  let textAlign = style.alignment || (isLeftChest ? 'left' : 'center');
   if (style.alignment === 'left') {
-    textAlign = 'left';
-    justifyContent = 'flex-start';
+    containerStyle.justifyContent = 'flex-start';
   } else if (style.alignment === 'right') {
-    textAlign = 'right';
-    justifyContent = 'flex-end';
+    containerStyle.justifyContent = 'flex-end';
   }
 
   // Text stroke / outline
@@ -32,7 +48,7 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
 
   // Base shadow
   const baseShadow = style.hasShadow
-    ? `${style.shadowOffsetX || 2}px ${style.shadowOffsetY || 3}px ${style.shadowBlur || 10}px ${style.shadowColor || 'rgba(0,0,0,0.9)'}`
+    ? `${style.shadowOffsetX || 0}px ${style.shadowOffsetY || 4}px ${style.shadowBlur || 16}px ${style.shadowColor || 'rgba(0,0,0,0.65)'}`
     : 'none';
 
   // Hex to RGBA conversion helper
@@ -55,11 +71,11 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
     : 'transparent';
 
   const boxBorder = style.hasBackgroundBox && style.hasNeonGlow
-    ? `1px solid ${style.neonColor || '#00F0FF'}`
+    ? `1px solid ${style.neonColor || '#3091F7'}`
     : 'none';
 
   const boxGlowShadow = style.hasBackgroundBox && style.hasNeonGlow
-    ? `0 0 16px ${hexToRgba(style.neonColor || '#00F0FF', 0.45)}`
+    ? `0 0 16px ${hexToRgba(style.neonColor || '#3091F7', 0.45)}`
     : 'none';
 
   // Words list
@@ -67,86 +83,130 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
     ? activeCaption.words 
     : [];
 
-  // Group words by pre-computed balanced lines if available
+  // Group words into balanced lines / 3-tier hierarchy (Prefix -> Hero -> Suffix)
   let lineGroups = [words];
-  if (activeCaption.lines && activeCaption.lines.length === 2 && words.length >= 3) {
-    const line1Count = activeCaption.lines[0].trim().split(/\s+/).length;
-    lineGroups = [
-      words.slice(0, line1Count),
-      words.slice(line1Count)
-    ];
+  if (activeCaption.lines && activeCaption.lines.length >= 2 && words.length >= 2) {
+    lineGroups = [];
+    let currIdx = 0;
+    for (const lineText of activeCaption.lines) {
+      const count = lineText.trim().split(/\s+/).length;
+      if (count > 0) {
+        lineGroups.push(words.slice(currIdx, currIdx + count));
+        currIdx += count;
+      }
+    }
+    if (currIdx < words.length) {
+      if (lineGroups.length > 0) {
+        lineGroups[lineGroups.length - 1] = lineGroups[lineGroups.length - 1].concat(words.slice(currIdx));
+      } else {
+        lineGroups.push(words.slice(currIdx));
+      }
+    }
+  } else if (words.length >= 3) {
+    // Dynamic 3-tier split fallback
+    const empIdx = words.findIndex(w => w.isEmphasized);
+    if (empIdx !== -1) {
+      const prefix = words.slice(0, empIdx);
+      const hero = words.slice(empIdx, empIdx + 1);
+      const suffix = words.slice(empIdx + 1);
+      lineGroups = [];
+      if (prefix.length > 0) lineGroups.push(prefix);
+      if (hero.length > 0) lineGroups.push(hero);
+      if (suffix.length > 0) lineGroups.push(suffix);
+    }
   }
 
-  const renderWord = (w, index) => {
+  const renderWord = (w, index, isLineHero = false) => {
     const rawText = w.word.trim();
     const isCurrent = currentTime >= w.start && currentTime <= w.end;
-    const isEmp = Boolean(w.isEmphasized);
-    const isPassed = currentTime > w.end;
+    const isEmp = Boolean(w.isEmphasized) || isLineHero;
     const isFuture = currentTime < w.start;
 
-    // Upper Dynamic & Spotlight Casing rules
+    // Casing rules matching reference video
     let displayText = rawText;
-    if (style.presetName === 'Upper Dynamic' || style.highlightType === 'spotlight') {
-      if (isCurrent || isEmp) {
-        displayText = rawText.toUpperCase();
-      } else if (style.normalWordCase === 'sentence') {
+    if (isEmp || (isCurrent && style.spotlightCase === 'uppercase')) {
+      displayText = rawText.toUpperCase();
+    } else if (style.normalWordCase === 'sentence') {
+      if (rawText.toLowerCase() === 'i') {
+        displayText = 'I';
+      } else {
         displayText = index === 0 ? rawText.charAt(0).toUpperCase() + rawText.slice(1).toLowerCase() : rawText.toLowerCase();
       }
     } else if (style.textTransform === 'uppercase') {
       displayText = rawText.toUpperCase();
     }
 
-    // Color calculation
+    // Colors and shadow
     let wordColor = style.textColor || '#FFFFFF';
-    let wordScale = 1.0;
     let wordShadow = baseShadow;
-    let wordBg = 'transparent';
-    let wordRadius = 0;
-    let wordPadding = '0px';
+    let wordScale = 1.0;
+    let wordOpacity = 1.0;
+    let wordTransform = 'none';
 
-    if (isCurrent) {
-      wordColor = style.activeWordColor || '#00B4D8';
-      wordScale = style.activeWordScale || 1.15;
-
-      // Neon aura on active word
-      if (style.hasNeonGlow) {
-        const nc = style.neonColor || '#00F0FF';
-        const ni = style.neonIntensity || 20;
-        wordShadow = `0 0 8px ${nc}, 0 0 ${ni}px ${nc}, ${baseShadow}`;
+    // Progressive smooth entrance matching reference video
+    if (style.animationPreset === 'smooth-fade') {
+      // The hero spotlight word and initial context words are visible immediately on card start
+      const isCardIntro = isEmp || (w.start <= (activeCaption.start || 0) + 0.2);
+      if (isFuture && !isCardIntro) {
+        wordOpacity = 0.0;
+        wordTransform = 'translateY(6px) scale(0.96)';
+      } else {
+        wordOpacity = 1.0;
+        wordTransform = isCurrent && isEmp ? 'scale(1.02)' : 'none';
       }
-
-      // Highlight Pill template
-      if (style.highlightType === 'pill') {
-        wordBg = style.activeWordBackground || '#10FF70';
-        wordColor = style.activeWordColor || '#000000';
-        wordRadius = `${style.activeWordBgRadius || 8}px`;
-        wordPadding = '2px 8px';
-      }
-    } else if (isEmp) {
-      // Standby emphasis keyword
-      wordColor = style.activeWordColor || '#00B4D8';
-      wordScale = 1.08;
-      if (style.hasNeonGlow) {
-        wordShadow = `0 0 10px ${style.neonColor || '#00B4D8'}, ${baseShadow}`;
-      }
-    } else if (style.highlightType === 'reveal' && isFuture) {
-      // Typewriter progressive reveal
-      wordColor = 'rgba(255, 255, 255, 0.2)';
     }
+
+    if (isEmp) {
+      // Hero Spotlight keyword
+      wordColor = style.activeWordColor || '#3091F7';
+      if (style.hasNeonGlow) {
+        const nc = style.neonColor || '#3091F7';
+        const ni = style.neonIntensity || 14;
+        wordShadow = `0 4px 18px rgba(0, 0, 0, 0.7), 0 0 ${ni}px ${hexToRgba(nc, 0.45)}`;
+      }
+    } else if (isCurrent) {
+      wordColor = style.activeWordColor || '#3091F7';
+      wordScale = 1.05;
+      if (style.highlightType === 'pill') {
+        return (
+          <span
+            key={`${w.start}_${w.word}_${index}`}
+            className="inline-block transition-all duration-120 ease-out select-none px-2 py-0.5 rounded-md"
+            style={{
+              backgroundColor: style.activeWordBackground || '#10FF70',
+              color: '#000000',
+              fontWeight: '800',
+              opacity: wordOpacity,
+              transform: wordTransform,
+              marginLeft: index === 0 ? '0px' : '4px',
+              marginRight: '4px',
+            }}
+          >
+            {displayText}
+          </span>
+        );
+      }
+    }
+
+    const heroScaleFactor = isEmp ? (style.activeWordScale || 2.15) : 1.0;
+    const computedFontSize = isEmp ? `${Math.round(style.fontSize * heroScaleFactor)}px` : `${style.fontSize}px`;
+    const computedFontWeight = isEmp ? (style.heroFontWeight || '900') : (style.fontWeight || '600');
 
     return (
       <span
         key={`${w.start}_${w.word}_${index}`}
-        className="inline-block transition-all duration-100 ease-out mx-[3px] select-none"
+        className="inline-block transition-all duration-120 ease-out select-none leading-none align-baseline"
         style={{
           color: wordColor,
-          transform: `scale(${wordScale})`,
+          fontSize: computedFontSize,
+          fontWeight: computedFontWeight,
+          opacity: wordOpacity,
+          transform: wordTransform,
           textShadow: wordShadow,
-          backgroundColor: wordBg,
-          borderRadius: wordRadius,
-          padding: wordPadding,
           WebkitTextStroke: textStroke,
-          fontWeight: (isCurrent || isEmp) ? '900' : style.fontWeight,
+          letterSpacing: isEmp ? '1.5px' : `${style.letterSpacing || 0.5}px`,
+          marginLeft: index === 0 ? '0px' : '5px',
+          marginRight: '5px',
         }}
       >
         {displayText}
@@ -156,19 +216,14 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
 
   return (
     <div 
-      className="absolute inset-x-0 pointer-events-none z-10 flex px-6 select-none"
-      style={{
-        top: topPosition,
-        transform: 'translateY(-50%)',
-        justifyContent,
-      }}
+      className="absolute pointer-events-none z-10 flex px-4 select-none transition-all duration-100"
+      style={containerStyle}
     >
       <div
         key={activeCaption.id}
-        className="max-w-[92%] inline-block transition-all duration-75 text-center"
+        className="inline-flex flex-col transition-all duration-100"
         style={{
-          fontFamily: style.fontFamily,
-          fontSize: `${style.fontSize}px`,
+          fontFamily: style.fontFamily || 'Poppins, sans-serif',
           backgroundColor: backgroundColor,
           padding: style.hasBackgroundBox 
             ? `${style.backgroundPadding}px ${Math.round(style.backgroundPadding * 1.6)}px` 
@@ -176,22 +231,39 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
           borderRadius: `${style.borderRadius}px`,
           border: boxBorder,
           boxShadow: boxGlowShadow,
-          letterSpacing: `${style.letterSpacing}px`,
-          lineHeight: style.lineSpacing,
           textAlign: textAlign,
+          alignItems: textAlign === 'left' ? 'flex-start' : (textAlign === 'right' ? 'flex-end' : 'center'),
           whiteSpace: 'normal',
           wordBreak: 'break-word',
           WebkitFontSmoothing: 'antialiased',
         }}
       >
         {words.length > 0 ? (
-          lineGroups.map((group, lineIdx) => (
-            <div key={lineIdx} className="leading-tight my-0.5">
-              {group.map((w, wIdx) => renderWord(w, lineIdx * 10 + wIdx))}
-            </div>
-          ))
+          lineGroups.map((group, lineIdx) => {
+            // Check if this line is the hero line (all words emphasized or line 1 of 3)
+            const isHeroLine = group.some(w => w.isEmphasized) && (group.length <= 2 || lineGroups.length === 3 && lineIdx === 1);
+            return (
+              <div 
+                key={lineIdx} 
+                className="leading-none my-1 flex flex-wrap items-baseline"
+                style={{
+                  justifyContent: textAlign === 'left' ? 'flex-start' : (textAlign === 'right' ? 'flex-end' : 'center'),
+                }}
+              >
+                {group.map((w, wIdx) => renderWord(w, wIdx, isHeroLine))}
+              </div>
+            );
+          })
         ) : (
-          <span style={{ color: style.textColor, textShadow: baseShadow, WebkitTextStroke: textStroke }}>
+          <span 
+            style={{ 
+              color: style.textColor, 
+              fontSize: `${style.fontSize}px`, 
+              fontWeight: style.fontWeight,
+              textShadow: baseShadow, 
+              WebkitTextStroke: textStroke 
+            }}
+          >
             {activeCaption.text}
           </span>
         )}
@@ -199,3 +271,4 @@ export default function CaptionOverlay({ activeCaption, style, currentTime = 0 }
     </div>
   );
 }
+
