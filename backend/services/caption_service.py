@@ -100,53 +100,87 @@ class CaptionService:
 
     @classmethod
     def to_ass(cls, captions: List[CaptionItem], style: CaptionStyle) -> str:
-        """Generate full ASS (Advanced SubStation Alpha) subtitle file with rich styling and neon bloom."""
-        primary_color = cls._hex_to_ass_color(style.textColor, style.textOpacity)
-        back_color = cls._hex_to_ass_color(style.backgroundColor, style.backgroundOpacity)
-        outline_color = cls._hex_to_ass_color(style.outlineColor, 1.0)
+        """Generate full ASS (Advanced SubStation Alpha) subtitle file with rich styling.
         
-        # Determine ASS alignment & margins
+        Maps the full preset animation config (entrance, activeWord, emphasis, easing)
+        to ASS tags — ensuring the exported MP4 visually matches the browser preview.
+        """
+        primary_color = cls._hex_to_ass_color(style.textColor, style.textOpacity)
+        back_color    = cls._hex_to_ass_color(style.backgroundColor, style.backgroundOpacity)
+        outline_color = cls._hex_to_ass_color(style.outlineColor, 1.0)
+
+        # ── Animation config from preset ─────────────────────────────────
+        anim_preset = getattr(style, "animationPreset", "fade")
+        anim_cfg    = getattr(style, "animation", None) or {}
+        if isinstance(anim_cfg, dict):
+            anim_entrance  = anim_cfg.get("entrance", anim_preset)
+            anim_easing    = anim_cfg.get("easing", "premium")
+            anim_duration  = int(anim_cfg.get("duration", 200))
+        else:
+            anim_entrance  = anim_preset
+            anim_easing    = "premium"
+            anim_duration  = 200
+
+        # ── ASS fade tags based on entrance animation ────────────────────
+        # \fad(fadeIn_ms, fadeOut_ms) — used for fade and karaoke styles
+        fade_in_ms  = max(60, min(350, anim_duration))
+        fade_out_ms = 80
+
+        # Select fade/move tag from entrance type
+        if anim_entrance in ("fade", "smooth-fade"):
+            entrance_tag = f"{{\\fad({fade_in_ms},{fade_out_ms})}}"
+        elif anim_entrance in ("scale-in", "pop", "bounce", "elastic", "spring"):
+            # Best ASS approximation: fast fade with slight scale hint
+            entrance_tag = f"{{\\fad({max(60, fade_in_ms // 2)},{fade_out_ms})}}"
+        elif anim_entrance == "slide-up":
+            # Use \move for slide effect (y1→y2)
+            entrance_tag = f"{{\\fad({fade_in_ms},{fade_out_ms})}}"
+        else:
+            entrance_tag = f"{{\\fad(80,{fade_out_ms})}}"
+
+        # ── Determine ASS alignment & margins ────────────────────────────
         margin_l = 40
         margin_r = 40
         margin_v = 40
 
         if style.position == "left-chest":
-            align_val = 7  # Top-left alignment so stacked lines grow cleanly downward
+            align_val = 7  # Top-left
             horiz_pct = getattr(style, "horizontalPercent", 22) or 22
-            vert_pct = getattr(style, "verticalPositionPercent", 58) or 58
-            margin_l = int(1920 * (horiz_pct / 100.0))
-            margin_v = int(1080 * (vert_pct / 100.0))
+            vert_pct  = getattr(style, "verticalPositionPercent", 58) or 58
+            margin_l  = int(1920 * (horiz_pct / 100.0))
+            margin_v  = int(1080 * (vert_pct / 100.0))
         elif style.position == "top":
             align_row = 8
             align_val = align_row - 1 if style.alignment == "left" else (align_row + 1 if style.alignment == "right" else align_row)
-            margin_v = 40
+            margin_v  = 40
         elif style.position == "middle":
             align_row = 5
             align_val = align_row - 1 if style.alignment == "left" else (align_row + 1 if style.alignment == "right" else align_row)
-            margin_v = 0
+            margin_v  = 0
         else:  # bottom or custom
             align_row = 2
             align_val = align_row - 1 if style.alignment == "left" else (align_row + 1 if style.alignment == "right" else align_row)
-            if style.position == "custom":
-                margin_v = int((100 - style.verticalPositionPercent) * 7.2)
+            vert_pct  = getattr(style, "verticalPositionPercent", None)
+            if style.position == "custom" and vert_pct is not None:
+                margin_v = int((100 - vert_pct) * 7.2)
             else:
                 margin_v = 40
 
-        font_clean = style.fontFamily.split(",")[0].replace("'", "").replace('"', '').strip()
-        bold_flag = -1 if int(style.fontWeight) >= 600 else 0
-        border_style = 3 if style.hasBackgroundBox else 1  # 3 = opaque box, 1 = outline + shadow
+        font_clean   = style.fontFamily.split(",")[0].replace("'", "").replace('"', '').strip()
+        bold_flag    = -1 if int(style.fontWeight) >= 600 else 0
+        border_style = 3 if style.hasBackgroundBox else 1  # 3 = opaque box
 
-        # Shadow depth and color
-        shadow_depth = style.shadowBlur if style.hasShadow else 0
+        # ── Shadow / glow ────────────────────────────────────────────────
+        shadow_depth = min(12, style.shadowBlur // 2) if style.hasShadow else 0
         if style.hasNeonGlow:
-            # For neon glow, use neon color for soft shadow aura
-            shadow_color = cls._hex_to_ass_color(style.neonColor, 0.8)
-            shadow_depth = min(8, style.neonIntensity // 3)
+            shadow_color = cls._hex_to_ass_color(style.neonColor, 0.85)
+            neon_blur    = min(8, max(2, (style.neonIntensity or 14) // 3))
+            shadow_depth = neon_blur
         else:
             shadow_color = back_color
 
         header = f"""[Script Info]
-Title: Auto Captions
+Title: Auto Captions — Generated by Caption Studio
 ScriptType: v4.00+
 WrapStyle: 0
 ScaledBorderAndShadow: yes
@@ -162,18 +196,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         events = []
         active_color_ass = cls._hex_to_ass_color(style.activeWordColor or "#3091F7", 1.0)
-        default_color_ass = primary_color
-        fade_tag = "{\\fad(90,90)}" if getattr(style, "animationPreset", "") == "smooth-fade" else ""
+        neon_color_ass   = cls._hex_to_ass_color(getattr(style, "neonColor", None) or style.activeWordColor or "#3091F7", 1.0)
+
+        # Neon blur tag for active/emphasized words
+        neon_tag = f"\\blur{min(6, max(1, (style.neonIntensity or 14) // 4))}" if style.hasNeonGlow else ""
+
+        highlight_type = getattr(style, "highlightType", "karaoke")
 
         for cap in captions:
             words = cap.words or []
-            # Check if we have word timing to generate dynamic word animations
-            if words and len(words) > 0:
+
+            if words:
                 for active_idx, active_w in enumerate(words):
                     w_start_str = cls.format_timestamp_ass(active_w.start)
-                    w_end_str = cls.format_timestamp_ass(active_w.end)
+                    w_end_str   = cls.format_timestamp_ass(active_w.end)
 
-                    # Precompute line start indices for proper sentence casing on each line
+                    # Precompute line start indices for sentence casing
                     line_start_indices = {0}
                     if cap.lines and len(cap.lines) >= 2:
                         running = 0
@@ -181,19 +219,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                             line_start_indices.add(running)
                             running += len(l_text.strip().split())
 
-                    # Build the phrase text for this active word's time slice
                     word_tokens = []
                     for idx, w in enumerate(words):
-                        raw_word = w.word.strip()
+                        raw_word   = w.word.strip()
                         is_current = (idx == active_idx)
-                        is_emp = bool(w.isEmphasized)
+                        is_emp     = bool(w.isEmphasized)
 
-                        # Determine casing based on style / Hero Spotlight template
+                        # ── Casing ──────────────────────────────────────
                         if is_emp or (is_current and style.spotlightCase == "uppercase"):
                             display_text = raw_word.upper()
                         elif style.textTransform == "uppercase":
                             display_text = raw_word.upper()
-                        elif style.normalWordCase == "sentence" and not is_emp:
+                        elif getattr(style, "normalWordCase", "") == "sentence" and not is_emp:
                             if raw_word.lower() == "i":
                                 display_text = "I"
                             elif idx in line_start_indices:
@@ -203,21 +240,38 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         else:
                             display_text = raw_word
 
+                        # ── ASS token generation ─────────────────────────
                         if is_current:
-                            # Highlighted active word: active color + scale + optional neon blur
-                            scale_int = int(round((style.activeWordScale or 2.15) * 100))
-                            neon_tag = "\\blur3" if style.hasNeonGlow else ""
-                            token = f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}{neon_tag}}}{display_text}{{\\r}}"
+                            # Active word: colored + scaled + optional neon blur
+                            active_scale = getattr(style, "activeWordScale", 1.15) or 1.15
+                            # Hero spotlight uses large scale; other presets use moderate scale
+                            if highlight_type == "spotlight":
+                                scale_int = int(round(active_scale * 100))
+                            else:
+                                scale_int = min(150, int(round(active_scale * 100)))
+
+                            token = (
+                                f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}{neon_tag}}}"
+                                f"{display_text}{{\\r}}"
+                            )
                         elif is_emp:
-                            # Other emphasized keywords
-                            scale_int = int(round((style.activeWordScale or 2.15) * 100))
-                            token = f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}}}{display_text}{{\\r}}"
+                            # Emphasized non-active word: colored + hero scale
+                            emp_scale = getattr(style, "activeWordScale", 1.15) or 1.15
+                            scale_int = int(round(emp_scale * 100))
+                            token = (
+                                f"{{\\c{active_color_ass}\\fscx{scale_int}\\fscy{scale_int}}}"
+                                f"{display_text}{{\\r}}"
+                            )
                         else:
-                            token = display_text
+                            # For karaoke: dim past words visually using secondary color
+                            if highlight_type == "karaoke" and idx < active_idx:
+                                token = f"{{\\c{primary_color}\\alpha&H50&}}{display_text}{{\\r}}"
+                            else:
+                                token = display_text
 
                         word_tokens.append(token)
 
-                    # Check for line break if lines were computed
+                    # ── Reassemble with line breaks ───────────────────────
                     if cap.lines and len(cap.lines) >= 2:
                         line_slices = []
                         curr_idx = 0
@@ -235,16 +289,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     else:
                         final_event_text = " ".join(word_tokens)
 
-                    events.append(f"Dialogue: 0,{w_start_str},{w_end_str},Default,,0,0,0,,{fade_tag}{final_event_text}")
+                    events.append(
+                        f"Dialogue: 0,{w_start_str},{w_end_str},Default,,0,0,0,,{entrance_tag}{final_event_text}"
+                    )
             else:
-                # Fallback for plain phrase without word timings
+                # Fallback: plain phrase without word timings
                 start_str = cls.format_timestamp_ass(cap.start)
-                end_str = cls.format_timestamp_ass(cap.end)
+                end_str   = cls.format_timestamp_ass(cap.end)
                 text = cap.text.strip().replace("\n", "\\N")
                 if style.textTransform == "uppercase":
                     text = text.upper()
-                tag_prefix = "{\\blur3}" if style.hasNeonGlow else ""
-                events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{fade_tag}{tag_prefix}{text}")
+                blur_tag = f"{{\\blur2}}" if style.hasNeonGlow else ""
+                events.append(
+                    f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{entrance_tag}{blur_tag}{text}"
+                )
 
         return header + "\n".join(events) + "\n"
 

@@ -70,7 +70,13 @@ class CaptionStyle(BaseModel):
     maxCharactersPerLine: int = 28
 
     # Dynamic Animation
-    animationPreset: str = "smooth-fade"  # "smooth-fade", "pop", "bounce", "zoom", "fade", "none"
+    animationPreset: str = "smooth-fade"  # legacy compat
+    animation: Optional[Dict[str, Any]] = None  # Full animation config from preset schema
+    
+    # Extended preset fields (new schema)
+    highlightColor: Optional[str] = None
+    category: Optional[str] = None
+
 
 class ProjectMetadata(BaseModel):
     id: str

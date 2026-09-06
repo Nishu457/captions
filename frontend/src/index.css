@@ -117,3 +117,112 @@
 .anim-neon-pulse {
   animation: neonGlowPulse 2.2s ease-in-out infinite alternate;
 }
+
+/* ── Animation Engine Easing CSS Custom Properties ────────────────────── */
+:root {
+  --ease-premium:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce:    cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-elastic:   cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --ease-easeout:   cubic-bezier(0, 0, 0.2, 1);
+  --ease-easeinout: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring:    cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* ── Additional word-level animation keyframes ────────────────────────── */
+@keyframes wordElastic {
+  0%   { transform: scale(0.3); opacity: 0; }
+  60%  { transform: scale(1.18); opacity: 1; }
+  80%  { transform: scale(0.94); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes wordBounceUp {
+  0%   { transform: translateY(14px) scale(0.92); opacity: 0; }
+  55%  { transform: translateY(-6px) scale(1.06); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes wordSlideUp {
+  0%   { transform: translateY(16px) translateX(-14px); opacity: 0; }
+  100% { transform: translateY(0) translateX(0); opacity: 1; }
+}
+
+@keyframes wordPop {
+  0%   { transform: scale(0.7); opacity: 0; }
+  70%  { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes wordGlitch {
+  0%   { transform: translateX(3px) skewX(-2deg); opacity: 0.4; filter: blur(1px); }
+  30%  { transform: translateX(-2px) skewX(1deg); opacity: 0.8; }
+  60%  { transform: translateX(1px) skewX(0deg); opacity: 1; filter: none; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes activeWordPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.85; }
+}
+
+@keyframes neonFlicker {
+  0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+    filter: drop-shadow(0 0 var(--neon-intensity, 14px) var(--neon-color, #00f0ff));
+  }
+  20%, 24%, 55% {
+    filter: none;
+  }
+}
+
+/* ── Utility classes for word animations ─────────────────────────────── */
+.word-elastic {
+  animation: wordElastic 0.22s var(--ease-elastic) forwards;
+}
+.word-bounce-up {
+  animation: wordBounceUp 0.26s var(--ease-spring) forwards;
+}
+.word-slide-up {
+  animation: wordSlideUp 0.22s var(--ease-premium) forwards;
+}
+.word-pop {
+  animation: wordPop 0.18s var(--ease-bounce) forwards;
+}
+.word-glitch {
+  animation: wordGlitch 0.18s linear forwards;
+}
+
+/* ── Caption container transition helper ─────────────────────────────── */
+.caption-container-enter {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.caption-container-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 180ms var(--ease-premium), transform 180ms var(--ease-premium);
+}
+
+/* ── Background radial gradient utility ──────────────────────────────── */
+.bg-gradient-radial {
+  background: radial-gradient(ellipse at center, var(--tw-gradient-stops));
+}
+
+/* ── Preset gallery card hover state ─────────────────────────────────── */
+.preset-card {
+  will-change: transform, box-shadow;
+  transition: transform 0.2s var(--ease-premium), box-shadow 0.2s var(--ease-premium), border-color 0.2s ease;
+}
+.preset-card:hover {
+  transform: translateY(-2px);
+}
+
+/* ── Custom scrollbar for style panel (thinner) ──────────────────────── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(56, 62, 89, 0.5);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}

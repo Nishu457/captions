@@ -9,7 +9,7 @@ import UploadModal from './components/UploadModal';
 import ProgressModal from './components/ProgressModal';
 import ExportModal from './components/ExportModal';
 
-import { STYLE_PRESETS } from './utils/captionStyles';
+import { STYLE_PRESETS, getDefaultPreset } from './utils/captionStyles';
 import { 
   fetchGPUStatus, 
   uploadMedia, 
@@ -28,7 +28,7 @@ export default function App() {
   
   // Captions and Styling
   const [captions, setCaptions] = useState([]);
-  const [style, setStyle] = useState(STYLE_PRESETS['Hero Spotlight'] || STYLE_PRESETS['Upper Dynamic']);
+  const [style, setStyle] = useState(() => getDefaultPreset());
 
   // UI State
   const [activeTab, setActiveTab] = useState('captions'); // 'captions', 'styles', 'upload', 'export'
@@ -76,7 +76,7 @@ export default function App() {
     setCaptions([]);
     setCurrentTime(0);
     setDuration(60);
-    setStyle(STYLE_PRESETS['Hero Spotlight'] || STYLE_PRESETS['Upper Dynamic']);
+    setStyle(getDefaultPreset());
   };
 
   // Re-segment captions dynamically on density change

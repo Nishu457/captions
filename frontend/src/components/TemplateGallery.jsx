@@ -1,179 +1,352 @@
-import React, { useState, useEffect } from 'react';
-import { Sparkles, Check, Flame, Zap, Play } from 'lucide-react';
-import { STYLE_PRESETS } from '../utils/captionStyles';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Check, Flame, Zap, Star, Mic, TrendingUp, Sparkles } from 'lucide-react';
+import { STYLE_PRESETS, PRESET_CATEGORIES } from '../utils/captionStyles';
+import {
+  getWordAnimState,
+  getDisplayText,
+  PREVIEW_SAMPLE_WORDS,
+  getPreviewTime,
+} from '../engine/animationEngine';
 
-export default function TemplateGallery({ currentStyle, onSelectTemplate }) {
-  const [activeFilter, setActiveFilter] = useState('All');
-  const [animStep, setAnimStep] = useState(1); // 0, 1, 2 for cycling sample words
+// ─────────────────────────────────────────────────────────────────────────────
+// LIVE PREVIEW CARD
+// Renders a mini animated caption preview using the real animation engine.
+// ─────────────────────────────────────────────────────────────────────────────
+function PresetPreviewCard({ preset, isSelected, onSelect, isHovered }) {
+  const [loopMs, setLoopMs]     = useState(0);
+  const animRef                 = useRef(null);
+  const startRef                = useRef(null);
+  const isActive                = isSelected || isHovered;
 
-  // Looping animation step for live animated previews inside every card
+  // Animate only when hovered or selected — saves CPU
   useEffect(() => {
-    const interval = setInterval(() => {
-      setAnimStep((prev) => (prev + 1) % 3);
-    }, 900);
-    return () => clearInterval(interval);
-  }, []);
+    if (!isActive) {
+      setLoopMs(600); // freeze at a nice mid-state
+      return;
+    }
+    let rafId;
+    const tick = (now) => {
+      if (!startRef.current) startRef.current = now;
+      setLoopMs(now - startRef.current);
+      rafId = requestAnimationFrame(tick);
+    };
+    startRef.current = null;
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [isActive]);
 
-  const sampleWords = [
-    { word: 'the', isEmp: false },
-    { word: 'BUMBLEBEE', isEmp: true },
-    { word: 'cannot fly', isEmp: false }
-  ];
+  const currentTime = getPreviewTime(loopMs);
+  const sampleWords = PREVIEW_SAMPLE_WORDS;
 
-  const filters = ['All', 'Trending', 'Spotlight', 'Neon', 'Clean'];
-
-  const filteredKeys = Object.keys(STYLE_PRESETS).filter((key) => {
-    if (activeFilter === 'All') return true;
-    const preset = STYLE_PRESETS[key];
-    if (activeFilter === 'Trending') return preset.tags?.includes('Trending') || preset.tags?.includes('Viral');
-    if (activeFilter === 'Spotlight') return preset.highlightType === 'spotlight' || preset.spotlightCase === 'uppercase';
-    if (activeFilter === 'Neon') return preset.hasNeonGlow;
-    if (activeFilter === 'Clean') return preset.tags?.includes('Clean') || preset.tags?.includes('Minimal');
-    return true;
+  // Compute which words should be visible and their state
+  const wordStates = sampleWords.map((word, idx) => {
+    const state = getWordAnimState(word, currentTime, preset, 0, idx);
+    const displayText = getDisplayText(word, idx, preset, currentTime >= word.start && currentTime <= word.end, word.isEmphasized);
+    return { word, state, displayText };
   });
+
+  const isLeftAlign = preset.alignment === 'left' || preset.position === 'left-chest';
+
+  const categoryIcon = {
+    Trending: <TrendingUp className="w-3 h-3" />,
+    Premium:  <Star className="w-3 h-3" />,
+    Dynamic:  <Zap className="w-3 h-3" />,
+    Podcast:  <Mic className="w-3 h-3" />,
+  }[preset.category] || <Sparkles className="w-3 h-3" />;
+
+  const categoryColor = {
+    Trending: 'text-amber-400 bg-amber-400/10 border-amber-400/30',
+    Premium:  'text-violet-400 bg-violet-400/10 border-violet-400/30',
+    Dynamic:  'text-cyan-400 bg-cyan-400/10 border-cyan-400/30',
+    Podcast:  'text-emerald-400 bg-emerald-400/10 border-emerald-400/30',
+  }[preset.category] || 'text-slate-400 bg-slate-400/10 border-slate-400/30';
+
+  return (
+    <div
+      ref={animRef}
+      onClick={() => onSelect(preset)}
+      className={`
+        relative rounded-2xl border cursor-pointer overflow-hidden group
+        transition-all duration-300 select-none
+        ${isSelected
+          ? 'bg-gradient-to-b from-dark-850 to-brand-950/40 border-brand-500 shadow-[0_0_20px_rgba(59,130,246,0.3)] ring-1 ring-brand-500/50'
+          : 'bg-dark-900/90 border-dark-700/70 hover:border-dark-500 hover:bg-dark-850'
+        }
+      `}
+    >
+      {/* Category + selection badge */}
+      <div className="flex items-center justify-between px-3 pt-3 pb-0">
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold border tracking-wider uppercase ${categoryColor}`}>
+          {categoryIcon}
+          {preset.category}
+        </span>
+        {isSelected && (
+          <div className="w-4 h-4 rounded-full bg-brand-500 flex items-center justify-center text-white shadow">
+            <Check className="w-2.5 h-2.5 stroke-[3]" />
+          </div>
+        )}
+      </div>
+
+      {/* ── LIVE ANIMATED PREVIEW ─────────────────────────────────────────── */}
+      <div
+        className="mx-3 mt-2 mb-0 h-28 rounded-xl overflow-hidden relative flex items-center justify-center"
+        style={{
+          background: 'linear-gradient(135deg, #0a0c14 0%, #111827 100%)',
+          border: '1px solid rgba(255,255,255,0.06)',
+        }}
+      >
+        {/* Subtle vignette */}
+        <div className="absolute inset-0 bg-gradient-radial from-transparent to-black/40 pointer-events-none" />
+
+        {/* Caption Preview — uses the real engine */}
+        <div
+          className="w-full flex flex-col px-4"
+          style={{
+            fontFamily: preset.fontFamily || 'Poppins, sans-serif',
+            alignItems: isLeftAlign ? 'flex-start' : 'center',
+            textAlign:  isLeftAlign ? 'left' : 'center',
+          }}
+        >
+          {/* All words on one preview line (compressed) */}
+          <div className="flex flex-wrap items-baseline justify-center gap-x-1">
+            {wordStates.map(({ word, state, displayText }, idx) => {
+              const isEmp = Boolean(word.isEmphasized);
+              const baseFontSize = Math.min(20, (preset.fontSize || 32) * 0.58);
+              const empScale    = isEmp && preset.highlightType === 'spotlight'
+                ? Math.min(1.8, preset.activeWordScale || 1.5)
+                : 1.0;
+              const fontSize    = `${Math.round(baseFontSize * empScale)}px`;
+
+              // Pill style
+              if (state.background && state.background !== 'transparent') {
+                return (
+                  <span
+                    key={idx}
+                    style={{
+                      color:        state.color,
+                      fontSize,
+                      fontWeight:   '800',
+                      background:   state.background,
+                      padding:      '1px 7px',
+                      borderRadius: `${preset.activeWordBgRadius || 6}px`,
+                      opacity:      Math.max(state.opacity ?? 1, 0.1),
+                      transform:    state.transform || 'none',
+                      transition:   state.transition,
+                      textShadow:   'none',
+                      willChange:   'transform, opacity',
+                    }}
+                  >
+                    {displayText}
+                  </span>
+                );
+              }
+
+              return (
+                <span
+                  key={idx}
+                  style={{
+                    color:            state.color,
+                    fontSize,
+                    fontWeight:       isEmp ? (preset.heroFontWeight || '900') : (preset.fontWeight || '700'),
+                    opacity:          Math.max(state.opacity ?? 1, 0.1),
+                    transform:        state.transform || 'none',
+                    transition:       state.transition,
+                    textShadow:       state.textShadow,
+                    WebkitTextStroke: state.WebkitTextStroke,
+                    filter:           state.filter || 'none',
+                    willChange:       'transform, opacity, color',
+                    textTransform:    preset.textTransform || 'none',
+                  }}
+                >
+                  {displayText}
+                </span>
+              );
+            })}
+          </div>
+
+          {/* Background box indicator */}
+          {preset.hasBackgroundBox && (
+            <div
+              className="mt-1 px-2 py-0.5 rounded text-[8px] font-semibold"
+              style={{
+                backgroundColor: (() => {
+                  const hex = preset.backgroundColor || '#000';
+                  const r = parseInt(hex.slice(1, 3), 16) || 0;
+                  const g = parseInt(hex.slice(3, 5), 16) || 0;
+                  const b = parseInt(hex.slice(5, 7), 16) || 0;
+                  return `rgba(${r},${g},${b},${preset.backgroundOpacity || 0.7})`;
+                })(),
+                borderRadius: `${preset.borderRadius || 6}px`,
+                color: preset.textColor,
+                opacity: 0.6,
+              }}
+            >
+              BG box enabled
+            </div>
+          )}
+        </div>
+
+        {/* "Playing" indicator when animated */}
+        {isActive && (
+          <div className="absolute top-2 right-2 flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse" />
+            <span className="text-[8px] text-brand-400 font-semibold tracking-wider">LIVE</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Preset Name & Tagline ──────────────────────────────────────────── */}
+      <div className="px-3 pb-3 pt-2.5">
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[11px] font-bold text-white tracking-wide leading-tight">
+            {preset.presetName}
+          </h3>
+          {preset.hasNeonGlow && (
+            <Flame className="w-3 h-3 text-amber-400 fill-amber-400/60 shrink-0" />
+          )}
+        </div>
+        <p className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+          {preset.tagline || 'Professional caption preset'}
+        </p>
+
+        {/* Tags */}
+        <div className="flex flex-wrap gap-1 mt-1.5">
+          {(preset.tags || []).slice(0, 3).map(tag => (
+            <span
+              key={tag}
+              className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-dark-800 text-slate-500 border border-dark-700/60"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Apply button — shown on hover */}
+      <div className={`
+        absolute bottom-0 left-0 right-0 px-3 pb-3 pt-6
+        bg-gradient-to-t from-dark-900 to-transparent
+        transition-all duration-200
+        ${isHovered && !isSelected ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-1 pointer-events-none'}
+      `}>
+        <button
+          onClick={e => { e.stopPropagation(); onSelect(preset); }}
+          className="w-full py-1.5 rounded-lg text-[10px] font-bold bg-brand-600 hover:bg-brand-500 text-white transition shadow-glow"
+        >
+          Apply Preset
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMPLATE GALLERY
+// ─────────────────────────────────────────────────────────────────────────────
+export default function TemplateGallery({ currentStyle, onSelectTemplate }) {
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [hoveredKey, setHoveredKey]         = useState(null);
+  const [searchQuery, setSearchQuery]       = useState('');
+
+  const categoryIcons = {
+    All:      <Sparkles className="w-3 h-3" />,
+    Trending: <TrendingUp className="w-3 h-3" />,
+    Premium:  <Star className="w-3 h-3" />,
+    Dynamic:  <Zap className="w-3 h-3" />,
+    Podcast:  <Mic className="w-3 h-3" />,
+  };
+
+  const allPresets = Object.entries(STYLE_PRESETS);
+
+  const filteredPresets = allPresets.filter(([key, p]) => {
+    const matchesCategory = activeCategory === 'All' || p.category === activeCategory;
+    const matchesSearch   = !searchQuery || (
+      p.presetName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.tagline?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      p.tags?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleSelect = useCallback((preset) => {
+    onSelectTemplate(preset);
+  }, [onSelectTemplate]);
 
   return (
     <div className="space-y-4 select-none">
-      {/* Filter Tabs */}
-      <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 custom-scrollbar">
-        {filters.map((f) => (
+      {/* Search */}
+      <div className="relative">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="Search presets..."
+          className="w-full bg-dark-800 border border-dark-700 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-brand-500 transition"
+        />
+        {searchQuery && (
           <button
-            key={f}
-            onClick={() => setActiveFilter(f)}
-            className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-              activeFilter === f
-                ? 'bg-brand-600 text-white shadow-glow'
-                : 'bg-dark-800 text-slate-400 hover:text-slate-200 hover:bg-dark-750'
-            }`}
+            onClick={() => setSearchQuery('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 text-xs"
           >
-            {f}
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Category tabs */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {PRESET_CATEGORIES.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`
+              inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold
+              transition-all duration-150
+              ${activeCategory === cat
+                ? 'bg-brand-600 text-white shadow-glow'
+                : 'bg-dark-800 text-slate-400 hover:text-slate-200 hover:bg-dark-700 border border-dark-700'
+              }
+            `}
+          >
+            {categoryIcons[cat]}
+            {cat}
           </button>
         ))}
       </div>
 
-      {/* Template Cards Grid */}
-      <div className="grid grid-cols-1 gap-3.5">
-        {filteredKeys.map((key) => {
-          const p = STYLE_PRESETS[key];
-          const isSelected = currentStyle.presetName === p.presetName;
+      {/* Results count */}
+      {searchQuery && (
+        <p className="text-[10px] text-slate-500">
+          {filteredPresets.length} preset{filteredPresets.length !== 1 ? 's' : ''} found
+        </p>
+      )}
 
+      {/* Preset cards grid */}
+      <div className="grid grid-cols-1 gap-3">
+        {filteredPresets.map(([key, preset]) => {
+          const isSelected = currentStyle?.presetName === preset.presetName;
+          const isHovered  = hoveredKey === key;
           return (
             <div
               key={key}
-              onClick={() => onSelectTemplate(p)}
-              className={`p-4 rounded-2xl border transition-all cursor-pointer relative flex flex-col justify-between overflow-hidden group ${
-                isSelected
-                  ? 'bg-gradient-to-b from-dark-850 to-brand-950/40 border-brand-500 shadow-glow ring-1 ring-brand-500/50'
-                  : 'bg-dark-900/90 hover:bg-dark-850 border-dark-700/80 hover:border-dark-600'
-              }`}
+              onMouseEnter={() => setHoveredKey(key)}
+              onMouseLeave={() => setHoveredKey(null)}
             >
-              {/* Top Tags Bar */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-1.5">
-                  {(p.tags || ['Dynamic']).map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-dark-950/80 text-slate-300 border border-dark-700 tracking-wide"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                {isSelected && (
-                  <div className="w-5 h-5 rounded-full bg-brand-500 flex items-center justify-center text-white shadow">
-                    <Check className="w-3 h-3 stroke-[3]" />
-                  </div>
-                )}
-              </div>
-
-              {/* LIVE ANIMATED PREVIEW BOX */}
-              <div className="h-28 rounded-xl bg-black/60 border border-dark-800/80 p-3 flex flex-col justify-center overflow-hidden my-1 relative">
-                {/* Visual Words Preview */}
-                <div 
-                  className={`transition-all duration-200 flex flex-col ${
-                    p.alignment === 'left' || p.position === 'left-chest' ? 'items-start pl-4 text-left' : 'items-center text-center'
-                  }`}
-                  style={{ fontFamily: p.fontFamily }}
-                >
-                  {p.presetName === 'Hero Spotlight' ? (
-                    <>
-                      <span 
-                        className="text-[13px] text-white font-semibold transition-all duration-150"
-                        style={{ opacity: animStep >= 0 ? 1 : 0 }}
-                      >
-                        get
-                      </span>
-
-                      {/* Main Spotlight Word */}
-                      <span
-                        className="inline-block transition-all duration-200 tracking-wider font-black leading-none my-0.5"
-                        style={{
-                          fontSize: '24px',
-                          color: '#3091F7',
-                          textShadow: '0 2px 10px rgba(0,0,0,0.8), 0 0 16px rgba(48,145,247,0.5)',
-                          transform: animStep >= 1 ? 'scale(1.02)' : 'scale(0.96)',
-                          opacity: animStep >= 1 ? 1 : 0.4,
-                        }}
-                      >
-                        MOTIVATED
-                      </span>
-
-                      <span 
-                        className="text-[12px] text-slate-200 font-semibold transition-all duration-150"
-                        style={{ opacity: animStep >= 2 ? 1 : 0.3 }}
-                      >
-                        start something
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-[12px] text-slate-300 font-medium">
-                        {p.spotlightCase === 'uppercase' && animStep === 0 ? 'THE' : 'the'}
-                      </span>
-
-                      {/* Main Spotlight Word */}
-                      <span
-                        className={`inline-block transition-all duration-150 tracking-wider ${
-                          animStep === 1 ? 'scale-110 font-black' : 'scale-100 font-extrabold'
-                        }`}
-                        style={{
-                          fontSize: `${Math.min(30, p.fontSize - 4)}px`,
-                          textShadow: (animStep === 1 && p.hasNeonGlow)
-                            ? `0 0 10px ${p.neonColor || '#3091F7'}, 0 0 20px ${p.neonColor || '#3091F7'}`
-                            : (p.hasShadow ? '0 2px 8px rgba(0,0,0,0.9)' : 'none'),
-                          backgroundColor: (animStep === 1 && p.highlightType === 'pill') ? (p.activeWordBackground || '#10FF70') : 'transparent',
-                          color: (animStep === 1 && p.highlightType === 'pill') ? '#000000' : ((animStep === 1 || p.highlightType === 'spotlight') ? (p.activeWordColor || '#3091F7') : p.textColor),
-                          padding: (animStep === 1 && p.highlightType === 'pill') ? '1px 8px' : '0px',
-                          borderRadius: (animStep === 1 && p.highlightType === 'pill') ? '6px' : '0px',
-                          textTransform: (p.spotlightCase === 'uppercase' || p.textTransform === 'uppercase') ? 'uppercase' : 'none',
-                        }}
-                      >
-                        BUMBLEBEE
-                      </span>
-
-                      <span className="text-[12px] text-slate-300 font-medium">
-                        {p.textTransform === 'uppercase' ? 'CANNOT FLY' : 'cannot fly'}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Title & Tagline */}
-              <div className="mt-3">
-                <div className="flex items-center space-x-1.5">
-                  <h3 className="text-xs font-bold text-white tracking-wide">
-                    {p.presetName}
-                  </h3>
-                  {p.hasNeonGlow && <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />}
-                </div>
-                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                  {p.tagline || 'Modern social video dynamic caption style'}
-                </p>
-              </div>
+              <PresetPreviewCard
+                preset={preset}
+                isSelected={isSelected}
+                isHovered={isHovered}
+                onSelect={handleSelect}
+              />
             </div>
           );
         })}
+
+        {filteredPresets.length === 0 && (
+          <div className="text-center py-8 text-slate-500 text-xs">
+            No presets match your search.
+          </div>
+        )}
       </div>
     </div>
   );
