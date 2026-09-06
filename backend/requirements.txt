@@ -1,0 +1,35 @@
+# ==============================================================================
+# LOCAL AI AUTO CAPTION GENERATOR - BACKEND DEPENDENCIES
+# ==============================================================================
+#
+# IMPORTANT NOTICE FOR LAPTOP B (GPU INFERENCE LAPTOP):
+# Your GPU environment ALREADY has PyTorch 2.8.0+cu128 and WhisperX 3.8.6 installed.
+# DO NOT reinstall or upgrade PyTorch, torchvision, torchaudio, or WhisperX.
+#
+# To install ONLY the application dependencies below on Laptop B, run:
+#   pip install -r backend/requirements.txt
+#
+# ==============================================================================
+# 1. Core Web Framework & Server
+# ==============================================================================
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+aiofiles>=23.2.1
+pydantic>=2.6.0
+pydantic-settings>=2.1.0
+
+# ==============================================================================
+# 2. Audio & Media Utilities (Auxiliary)
+# ==============================================================================
+# (FFmpeg binary must be installed on your system and available in PATH)
+# numpy is used for audio arrays
+numpy>=1.24.0
+
+# ==============================================================================
+# PRE-INSTALLED ON LAPTOP B (DO NOT UNCOMMENT UNLESS SETTING UP FROM SCRATCH):
+# ==============================================================================
+# torch==2.8.0+cu128
+# torchvision==0.23.0+cu128
+# torchaudio==2.8.0+cu128
+# whisperx==3.8.6
