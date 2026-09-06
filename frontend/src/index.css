@@ -26,23 +26,94 @@
 
 /* Glassmorphic panels */
 .glass-panel {
-  background: rgba(21, 24, 36, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(18, 21, 33, 0.82);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-panel-subtle {
-  background: rgba(15, 17, 26, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(15, 17, 26, 0.65);
+  backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Subtle glow animation */
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.8; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.02); }
+/* Caption Entrance & Pulse Keyframes */
+@keyframes captionPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(6px);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.06) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
-.animate-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
+@keyframes captionBounce {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+  }
+  50% {
+    transform: translateY(-4px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes captionFadeUp {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes captionZoomPunch {
+  0% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes neonGlowPulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px var(--neon-color, #00f0ff)) drop-shadow(0 0 25px var(--neon-color, #00f0ff));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px var(--neon-color, #00f0ff)) drop-shadow(0 0 40px var(--neon-color, #00f0ff));
+  }
+}
+
+.anim-pop {
+  animation: captionPop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.anim-bounce {
+  animation: captionBounce 0.28s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.anim-fade {
+  animation: captionFadeUp 0.2s ease-out forwards;
+}
+
+.anim-zoom {
+  animation: captionZoomPunch 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.1) forwards;
+}
+
+.anim-neon-pulse {
+  animation: neonGlowPulse 2.2s ease-in-out infinite alternate;
 }

@@ -32,8 +32,11 @@ class CaptionStyle(BaseModel):
     letterSpacing: float = 0.5  # px
     lineSpacing: float = 1.2
     textTransform: str = "none"  # "none", "uppercase", "capitalize"
-    animationPreset: str = "none"  # "none", "pop", "fade"
-    presetName: Optional[str] = "Classic"
+    hasNeonGlow: bool = False
+    neonColor: str = "#00F0FF"
+    neonIntensity: int = 20
+    animationPreset: str = "pop"  # "pop", "bounce", "zoom", "fade", "none"
+    presetName: Optional[str] = "Hormozi Pop"
 
 class ProjectMetadata(BaseModel):
     id: str

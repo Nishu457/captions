@@ -100,7 +100,7 @@ class CaptionService:
 
     @classmethod
     def to_ass(cls, captions: List[CaptionItem], style: CaptionStyle) -> str:
-        """Generate full ASS (Advanced SubStation Alpha) subtitle file with rich styling."""
+        """Generate full ASS (Advanced SubStation Alpha) subtitle file with rich styling and neon bloom."""
         primary_color = cls._hex_to_ass_color(style.textColor, style.textOpacity)
         back_color = cls._hex_to_ass_color(style.backgroundColor, style.backgroundOpacity)
         outline_color = cls._hex_to_ass_color(style.outlineColor, 1.0)
@@ -126,10 +126,20 @@ class CaptionService:
         bold_flag = -1 if int(style.fontWeight) >= 600 else 0
         border_style = 3 if style.hasBackgroundBox else 1  # 3 = opaque box, 1 = outline + shadow
 
+        # Shadow depth and color
+        shadow_depth = style.shadowBlur if style.hasShadow else 0
+        if style.hasNeonGlow:
+            # For neon glow, use neon color for shadow aura
+            shadow_color = cls._hex_to_ass_color(style.neonColor, 0.8)
+            shadow_depth = min(8, style.neonIntensity // 3)
+        else:
+            shadow_color = back_color
+
         margin_v = 40
         if style.position == "custom":
-            # approximate percent margin
             margin_v = int((100 - style.verticalPositionPercent) * 7.2)
+        elif style.position == "middle":
+            margin_v = 0
 
         header = f"""[Script Info]
 Title: Auto Captions
@@ -141,7 +151,7 @@ PlayResY: 1080
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_clean},{style.fontSize * 2},{primary_color},&H000000FF,{outline_color},{back_color},{bold_flag},0,0,0,100,100,{style.letterSpacing},0,{border_style},{style.outlineWidth},{style.shadowBlur if style.hasShadow else 0},{align_val},40,40,{margin_v},1
+Style: Default,{font_clean},{style.fontSize * 2},{primary_color},&H000000FF,{outline_color},{shadow_color},{bold_flag},0,0,0,100,100,{style.letterSpacing},0,{border_style},{style.outlineWidth},{shadow_depth},{align_val},40,40,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -150,13 +160,15 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         for cap in captions:
             start_str = cls.format_timestamp_ass(cap.start)
             end_str = cls.format_timestamp_ass(cap.end)
-            # Escape newlines for ASS format
             text = cap.text.strip().replace("\n", "\\N")
             if style.textTransform == "uppercase":
                 text = text.upper()
             elif style.textTransform == "capitalize":
                 text = text.title()
-            events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{text}")
+
+            # Add ASS blur tag for neon glow bloom if enabled
+            tag_prefix = "{\\blur3}" if style.hasNeonGlow else ""
+            events.append(f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{tag_prefix}{text}")
 
         return header + "\n".join(events) + "\n"
 

@@ -27,7 +27,7 @@ export default function App() {
   
   // Captions and Styling
   const [captions, setCaptions] = useState([]);
-  const [style, setStyle] = useState(STYLE_PRESETS.Classic);
+  const [style, setStyle] = useState(STYLE_PRESETS['Hormozi Pop']);
 
   // UI State
   const [activeTab, setActiveTab] = useState('captions'); // 'captions', 'styles', 'upload', 'export'
@@ -75,7 +75,7 @@ export default function App() {
     setCaptions([]);
     setCurrentTime(0);
     setDuration(60);
-    setStyle(STYLE_PRESETS.Classic);
+    setStyle(STYLE_PRESETS['Hormozi Pop']);
   };
 
   // Start Upload & Transcription Workflow
