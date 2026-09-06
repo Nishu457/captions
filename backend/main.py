@@ -76,18 +76,41 @@ app.include_router(captions.router)
 app.include_router(export.router)
 
 # Serve pre-built frontend SPA if frontend/dist exists
-if settings.FRONTEND_DIST_PATH.exists() and (settings.FRONTEND_DIST_PATH / "index.html").exists():
-    app.mount("/assets", StaticFiles(directory=str(settings.FRONTEND_DIST_PATH / "assets")), name="static_assets")
+index_html_path = settings.FRONTEND_DIST_PATH / "index.html"
+assets_path = settings.FRONTEND_DIST_PATH / "assets"
+
+if settings.FRONTEND_DIST_PATH.exists() and index_html_path.exists():
+    if assets_path.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_path)), name="static_assets")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(index_html_path)
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        # Allow API and media routes to bypass SPA catch-all
         if full_path.startswith(("api/", "media/")):
             return None
-        file_path = settings.FRONTEND_DIST_PATH / full_path
-        if file_path.exists() and file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(settings.FRONTEND_DIST_PATH / "index.html")
+        target_file = settings.FRONTEND_DIST_PATH / full_path
+        if target_file.exists() and target_file.is_file():
+            return FileResponse(target_file)
+        return FileResponse(index_html_path)
+else:
+    @app.get("/")
+    def serve_fallback():
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse("""
+        <!DOCTYPE html>
+        <html>
+        <head><title>Auto Caption Studio - Backend Running</title></head>
+        <body style="font-family: sans-serif; background: #0f111a; color: #fff; padding: 40px; text-align: center;">
+            <h1 style="color: #6366f1;">Auto Caption Studio Backend is Online</h1>
+            <p>The FastAPI backend server is active and listening.</p>
+            <p style="color: #94a3b8;">API Documentation is available at <a href="/docs" style="color: #818cf8;">/docs</a></p>
+            <p style="color: #f59e0b;">Frontend dist folder not found. Please update git repository to include pre-built frontend.</p>
+        </body>
+        </html>
+        """)
 
 if __name__ == "__main__":
     import uvicorn
